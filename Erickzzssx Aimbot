@@ -84,7 +84,7 @@ MinimizeButton.MouseButton1Click:Connect(function()
         MainFrame.Position = UDim2.new(0, 20, 0, 100)
         MinimizeButton.Text = "Restaurar"
         
-        -- Tornar os botões de ESP, Aimbot e Teleporte invisíveis
+        -- Tornar os botões de ESP, Aimbot, Teleporte e TeamCheck invisíveis
         EspButton.Visible = false
         AimbotButton.Visible = false
         TeleportButton.Visible = false
