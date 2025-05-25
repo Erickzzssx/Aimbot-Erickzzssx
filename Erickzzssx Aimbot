@@ -17,7 +17,23 @@ local function isSameTeam(player)
 end
 
 --------------------------------------------------
--- Criação da GUI Principal (ESP, Aimbot e Teleporte) --
+-- Remove ESP quando um jogador sai
+--------------------------------------------------
+Players.PlayerRemoving:Connect(function(player)
+    local esp = espBoxes[player]
+    if esp then
+        if esp.box then
+            esp.box:Remove()
+        end
+        if esp.text then
+            esp.text:Remove()
+        end
+        espBoxes[player] = nil
+    end
+end)
+
+--------------------------------------------------
+-- Criação da GUI Principal (ESP, Aimbot e Teleporte)
 --------------------------------------------------
 local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
 ScreenGui.ResetOnSpawn = false
@@ -47,12 +63,12 @@ local AimbotButton = createButton(MainFrame, "Ativar Aimbot", UDim2.new(0, 10, 0
 local TeleportButton = createButton(MainFrame, "Teleporte", UDim2.new(0, 10, 0, 130))
 
 --------------------------------------------------
--- Adicionando o botão de TeamCheck --
+-- Adicionando o botão de TeamCheck
 --------------------------------------------------
 local TeamCheckButton = createButton(MainFrame, "Ativar TeamCheck", UDim2.new(0, 10, 0, 190))
 
 --------------------------------------------------
--- Criação do botão de Minimizar e Restaurar --
+-- Criação do botão de Minimizar e Restaurar
 --------------------------------------------------
 local MinimizeButton = Instance.new("TextButton", MainFrame)
 MinimizeButton.Size = UDim2.new(0, 200, 0, 30)
@@ -94,7 +110,7 @@ MinimizeButton.MouseButton1Click:Connect(function()
 end)
 
 --------------------------------------------------
--- Criação do TeleportFrame --
+-- Criação do TeleportFrame
 --------------------------------------------------
 local TeleportFrame = Instance.new("Frame", ScreenGui)
 TeleportFrame.Size = UDim2.new(0, 220, 0, 300)
@@ -113,7 +129,7 @@ CloseTeleportButton.TextSize = 18
 CloseTeleportButton.BorderSizePixel = 2
 
 --------------------------------------------------
--- Funções do ESP e Aimbot --
+-- Funções do ESP e Aimbot
 --------------------------------------------------
 
 -- Cria o ESP com a caixa e o texto (para distância e vida)
@@ -162,6 +178,15 @@ local function getClosestToCrosshair()
 end
 
 RunService.RenderStepped:Connect(function()
+    -- Remover jogadores "fantasmas" de espBoxes, caso o Character ou o Player não existam mais
+    for player, esp in pairs(espBoxes) do
+        if not player.Parent or not player.Character then
+            if esp.box then esp.box:Remove() end
+            if esp.text then esp.text:Remove() end
+            espBoxes[player] = nil
+        end
+    end
+
     for _, player in pairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character and espEnabled and (not teamCheckEnabled or not isSameTeam(player)) then  -- Condição modificada para FFA
             createESP(player)
@@ -172,22 +197,26 @@ RunService.RenderStepped:Connect(function()
                 local screenPosition, onScreen = Camera:WorldToViewportPoint(head.Position)
                 if onScreen then
                     local esp = espBoxes[player]
-                    esp.box.Visible = true
-                    esp.box.Position = Vector2.new(screenPosition.X - 25, screenPosition.Y - 25)
-                    esp.box.Size = Vector2.new(50, 50)
-                    
-                    -- ADICIONANDO DISTÂNCIA E VIDA
-                    local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
-                    if humanoid then
-                        local distance = math.floor((LocalPlayer.Character.Head.Position - head.Position).Magnitude)
-                        local health = math.floor(humanoid.Health)
-                        esp.text.Visible = true
-                        esp.text.Position = Vector2.new(screenPosition.X, screenPosition.Y - 35)
-                        esp.text.Text = string.format("Dist: %d | Vida: %d", distance, health)
+                    if esp then
+                        esp.box.Visible = true
+                        esp.box.Position = Vector2.new(screenPosition.X - 25, screenPosition.Y - 25)
+                        esp.box.Size = Vector2.new(50, 50)
+                        
+                        -- ADICIONANDO DISTÂNCIA E VIDA
+                        local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+                        if humanoid then
+                            local distance = math.floor((LocalPlayer.Character.Head.Position - head.Position).Magnitude)
+                            local health = math.floor(humanoid.Health)
+                            esp.text.Visible = true
+                            esp.text.Position = Vector2.new(screenPosition.X, screenPosition.Y - 35)
+                            esp.text.Text = string.format("Dist: %d | Vida: %d", distance, health)
+                        end
                     end
                 else
-                    espBoxes[player].box.Visible = false
-                    espBoxes[player].text.Visible = false
+                    if espBoxes[player] then
+                        espBoxes[player].box.Visible = false
+                        espBoxes[player].text.Visible = false
+                    end
                 end
             end
         else
@@ -234,7 +263,7 @@ TeamCheckButton.MouseButton1Click:Connect(function()
 end)
 
 --------------------------------------------------
--- Atualização e exibição do TeleportFrame --
+-- Atualização e exibição do TeleportFrame
 --------------------------------------------------
 local function updateTeleportFrame()
     -- Limpar as entradas antigas
