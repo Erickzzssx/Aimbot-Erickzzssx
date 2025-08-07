@@ -1,299 +1,504 @@
--- Serviços e variáveis iniciais
+local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
+local TweenService = game:GetService("TweenService")
 local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
 
-local espEnabled = false
+-- Variáveis do Aimbot
+local isAiming = false
 local aimbotEnabled = false
-local aiming = false -- Variável para verificar se o botão direito está pressionado
-local espBoxes = {}  -- Guardará as caixas de ESP (e textos) de cada jogador
-local teamCheckEnabled = true  -- Por padrão, o TeamCheck está ativado
+local connection
 
--- Função para verificar se os jogadores estão no mesmo time
-local function isSameTeam(player)
-    return LocalPlayer.Team == player.Team
-end
+-- Variáveis do ESP
+local espEnabled = false
+local skeletonEnabled = false
+local boxEnabled = false
+local espObjects = {}
 
---------------------------------------------------
--- Remove ESP quando um jogador sai
---------------------------------------------------
-Players.PlayerRemoving:Connect(function(player)
-    local esp = espBoxes[player]
-    if esp then
-        if esp.box then
-            esp.box:Remove()
-        end
-        if esp.text then
-            esp.text:Remove()
-        end
-        espBoxes[player] = nil
-    end
-end)
+-- Criação da GUI
+local ScreenGui = Instance.new("ScreenGui")
+local MainFrame = Instance.new("Frame")
+local SideBar = Instance.new("Frame")
+local ContentFrame = Instance.new("Frame")
+local Title = Instance.new("TextLabel")
+local CloseButton = Instance.new("TextButton")
 
---------------------------------------------------
--- Criação da GUI Principal (ESP, Aimbot e Teleporte)
---------------------------------------------------
-local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
-ScreenGui.ResetOnSpawn = false
+-- Botões da sidebar
+local AimbotTab = Instance.new("TextButton")
+local VisualsTab = Instance.new("TextButton")
 
-local MainFrame = Instance.new("Frame", ScreenGui)
-MainFrame.Size = UDim2.new(0, 220, 0, 350)  -- Ajuste do tamanho
-MainFrame.Position = UDim2.new(0, 20, 0, 100)
-MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-MainFrame.BorderSizePixel = 2
-MainFrame.BackgroundTransparency = 0.2
+-- Frames de conteúdo
+local AimbotContent = Instance.new("Frame")
+local VisualsContent = Instance.new("Frame")
 
-local function createButton(parent, text, position)
-    local button = Instance.new("TextButton", parent)
-    button.Size = UDim2.new(0, 200, 0, 50)
-    button.Position = position
-    button.Text = text
-    button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-    button.TextColor3 = Color3.fromRGB(255, 255, 255)
-    button.Font = Enum.Font.SourceSansBold
-    button.TextSize = 18
-    button.BorderSizePixel = 2
+-- Configuração da GUI principal
+ScreenGui.Name = "ModernHack"
+ScreenGui.Parent = game.CoreGui
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+-- Frame principal
+MainFrame.Name = "MainFrame"
+MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+MainFrame.BorderSizePixel = 0
+MainFrame.Position = UDim2.new(0.3, 0, 0.3, 0)
+MainFrame.Size = UDim2.new(0, 600, 0, 400)
+MainFrame.Active = true
+MainFrame.Draggable = true
+
+-- Bordas arredondadas
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 10)
+MainCorner.Parent = MainFrame
+
+-- Título
+Title.Name = "Title"
+Title.Parent = MainFrame
+Title.BackgroundTransparency = 1
+Title.Position = UDim2.new(0, 20, 0, 10)
+Title.Size = UDim2.new(0, 200, 0, 30)
+Title.Font = Enum.Font.GothamBold
+Title.Text = "Orochi aim v2"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 18
+Title.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Botão fechar
+CloseButton.Name = "CloseButton"
+CloseButton.Parent = MainFrame
+CloseButton.BackgroundColor3 = Color3.fromRGB(220, 53, 69)
+CloseButton.BorderSizePixel = 0
+CloseButton.Position = UDim2.new(1, -40, 0, 10)
+CloseButton.Size = UDim2.new(0, 30, 0, 30)
+CloseButton.Font = Enum.Font.GothamBold
+CloseButton.Text = "X"
+CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseButton.TextSize = 14
+
+local CloseCorner = Instance.new("UICorner")
+CloseCorner.CornerRadius = UDim.new(0, 5)
+CloseCorner.Parent = CloseButton
+
+-- Sidebar
+SideBar.Name = "SideBar"
+SideBar.Parent = MainFrame
+SideBar.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+SideBar.BorderSizePixel = 0
+SideBar.Position = UDim2.new(0, 0, 0, 50)
+SideBar.Size = UDim2.new(0, 150, 1, -50)
+
+local SideCorner = Instance.new("UICorner")
+SideCorner.CornerRadius = UDim.new(0, 10)
+SideCorner.Parent = SideBar
+
+-- Content Frame
+ContentFrame.Name = "ContentFrame"
+ContentFrame.Parent = MainFrame
+ContentFrame.BackgroundTransparency = 1
+ContentFrame.Position = UDim2.new(0, 150, 0, 50)
+ContentFrame.Size = UDim2.new(1, -150, 1, -50)
+
+-- Função para criar botões da sidebar
+local function createSideButton(name, text, position, icon)
+    local button = Instance.new("TextButton")
+    button.Name = name
+    button.Parent = SideBar
+    button.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+    button.BorderSizePixel = 0
+    button.Position = UDim2.new(0, 10, 0, position)
+    button.Size = UDim2.new(1, -20, 0, 40)
+    button.Font = Enum.Font.Gotham
+    button.Text = "  " .. icon .. " " .. text
+    button.TextColor3 = Color3.fromRGB(200, 200, 200)
+    button.TextSize = 14
+    button.TextXAlignment = Enum.TextXAlignment.Left
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = button
+    
     return button
 end
 
-local EspButton = createButton(MainFrame, "Ativar ESP", UDim2.new(0, 10, 0, 10))
-local AimbotButton = createButton(MainFrame, "Ativar Aimbot", UDim2.new(0, 10, 0, 70))
-local TeleportButton = createButton(MainFrame, "Teleporte", UDim2.new(0, 10, 0, 130))
+-- Criar botões da sidebar
+AimbotTab = createSideButton("AimbotTab", "Aimbot", 10, "🎯")
+VisualsTab = createSideButton("VisualsTab", "Visuals", 60, "👁️")
 
---------------------------------------------------
--- Adicionando o botão de TeamCheck
---------------------------------------------------
-local TeamCheckButton = createButton(MainFrame, "Ativar TeamCheck", UDim2.new(0, 10, 0, 190))
-
---------------------------------------------------
--- Criação do botão de Minimizar e Restaurar
---------------------------------------------------
-local MinimizeButton = Instance.new("TextButton", MainFrame)
-MinimizeButton.Size = UDim2.new(0, 200, 0, 30)
-MinimizeButton.Position = UDim2.new(0, 10, 0, 240)
-MinimizeButton.Text = "Minimizar"
-MinimizeButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-MinimizeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-MinimizeButton.Font = Enum.Font.SourceSansBold
-MinimizeButton.TextSize = 18
-MinimizeButton.BorderSizePixel = 2
-
-local isMinimized = false
-
-MinimizeButton.MouseButton1Click:Connect(function()
-    if isMinimized then
-        -- Restaurar a GUI
-        MainFrame.Size = UDim2.new(0, 220, 0, 350)
-        MainFrame.Position = UDim2.new(0, 20, 0, 100)
-        MinimizeButton.Text = "Minimizar"
+-- Função para criar toggle buttons
+local function createToggle(parent, text, position, callback)
+    local frame = Instance.new("Frame")
+    frame.Parent = parent
+    frame.BackgroundTransparency = 1
+    frame.Position = UDim2.new(0, 20, 0, position)
+    frame.Size = UDim2.new(1, -40, 0, 40)
+    
+    local label = Instance.new("TextLabel")
+    label.Parent = frame
+    label.BackgroundTransparency = 1
+    label.Position = UDim2.new(0, 0, 0, 0)
+    label.Size = UDim2.new(1, -80, 1, 0)
+    label.Font = Enum.Font.Gotham
+    label.Text = text
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    label.TextSize = 14
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    
+    local toggle = Instance.new("TextButton")
+    toggle.Parent = frame
+    toggle.BackgroundColor3 = Color3.fromRGB(60, 60, 65)
+    toggle.BorderSizePixel = 0
+    toggle.Position = UDim2.new(1, -60, 0.5, -10)
+    toggle.Size = UDim2.new(0, 50, 0, 20)
+    toggle.Text = ""
+    
+    local toggleCorner = Instance.new("UICorner")
+    toggleCorner.CornerRadius = UDim.new(0, 10)
+    toggleCorner.Parent = toggle
+    
+    local indicator = Instance.new("Frame")
+    indicator.Parent = toggle
+    indicator.BackgroundColor3 = Color3.fromRGB(150, 150, 150)
+    indicator.BorderSizePixel = 0
+    indicator.Position = UDim2.new(0, 2, 0.5, -8)
+    indicator.Size = UDim2.new(0, 16, 0, 16)
+    
+    local indicatorCorner = Instance.new("UICorner")
+    indicatorCorner.CornerRadius = UDim.new(0, 8)
+    indicatorCorner.Parent = indicator
+    
+    local enabled = false
+    
+    toggle.MouseButton1Click:Connect(function()
+        enabled = not enabled
+        callback(enabled)
         
-        -- Tornar os outros botões visíveis novamente
-        EspButton.Visible = true
-        AimbotButton.Visible = true
-        TeleportButton.Visible = true
-        TeamCheckButton.Visible = true
-    else
-        -- Minimizar a GUI (ocultar tudo, exceto o botão de Restaurar)
-        MainFrame.Size = UDim2.new(0, 220, 0, 50)
-        MainFrame.Position = UDim2.new(0, 20, 0, 100)
-        MinimizeButton.Text = "Restaurar"
-        
-        -- Tornar os botões de ESP, Aimbot, Teleporte e TeamCheck invisíveis
-        EspButton.Visible = false
-        AimbotButton.Visible = false
-        TeleportButton.Visible = false
-        TeamCheckButton.Visible = false
-    end
-    isMinimized = not isMinimized
+        local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad)
+        if enabled then
+            toggle.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+            indicator.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            TweenService:Create(indicator, tweenInfo, {Position = UDim2.new(1, -18, 0.5, -8)}):Play()
+        else
+            toggle.BackgroundColor3 = Color3.fromRGB(60, 60, 65)
+            indicator.BackgroundColor3 = Color3.fromRGB(150, 150, 150)
+            TweenService:Create(indicator, tweenInfo, {Position = UDim2.new(0, 2, 0.5, -8)}):Play()
+        end
+    end)
+    
+    return toggle
+end
+
+-- Aimbot Content
+AimbotContent.Name = "AimbotContent"
+AimbotContent.Parent = ContentFrame
+AimbotContent.BackgroundTransparency = 1
+AimbotContent.Size = UDim2.new(1, 0, 1, 0)
+AimbotContent.Visible = true
+
+local aimbotTitle = Instance.new("TextLabel")
+aimbotTitle.Parent = AimbotContent
+aimbotTitle.BackgroundTransparency = 1
+aimbotTitle.Position = UDim2.new(0, 20, 0, 10)
+aimbotTitle.Size = UDim2.new(1, -40, 0, 30)
+aimbotTitle.Font = Enum.Font.GothamBold
+aimbotTitle.Text = "Aimbot Settings"
+aimbotTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+aimbotTitle.TextSize = 16
+aimbotTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Visuals Content
+VisualsContent.Name = "VisualsContent"
+VisualsContent.Parent = ContentFrame
+VisualsContent.BackgroundTransparency = 1
+VisualsContent.Size = UDim2.new(1, 0, 1, 0)
+VisualsContent.Visible = false
+
+local visualsTitle = Instance.new("TextLabel")
+visualsTitle.Parent = VisualsContent
+visualsTitle.BackgroundTransparency = 1
+visualsTitle.Position = UDim2.new(0, 20, 0, 10)
+visualsTitle.Size = UDim2.new(1, -40, 0, 30)
+visualsTitle.Font = Enum.Font.GothamBold
+visualsTitle.Text = "Visual Settings"
+visualsTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+visualsTitle.TextSize = 16
+visualsTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Criar toggles
+createToggle(AimbotContent, "Enable Aimbot", 50, function(enabled)
+    aimbotEnabled = enabled
 end)
 
---------------------------------------------------
--- Criação do TeleportFrame
---------------------------------------------------
-local TeleportFrame = Instance.new("Frame", ScreenGui)
-TeleportFrame.Size = UDim2.new(0, 220, 0, 300)
-TeleportFrame.Position = UDim2.new(0, 250, 0, 100)
-TeleportFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-TeleportFrame.Visible = false
+createToggle(VisualsContent, "Box ESP", 50, function(enabled)
+    boxEnabled = enabled
+    if not enabled then
+        clearESP()
+    end
+end)
 
-local CloseTeleportButton = Instance.new("TextButton", TeleportFrame)
-CloseTeleportButton.Size = UDim2.new(0, 200, 0, 30)
-CloseTeleportButton.Position = UDim2.new(0, 10, 0, 270)
-CloseTeleportButton.Text = "Fechar"
-CloseTeleportButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-CloseTeleportButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-CloseTeleportButton.Font = Enum.Font.SourceSansBold
-CloseTeleportButton.TextSize = 18
-CloseTeleportButton.BorderSizePixel = 2
+createToggle(VisualsContent, "Skeleton ESP", 100, function(enabled)
+    skeletonEnabled = enabled
+    if not enabled then
+        clearESP()
+    end
+end)
 
---------------------------------------------------
--- Funções do ESP e Aimbot
---------------------------------------------------
-
--- Cria o ESP com a caixa e o texto (para distância e vida)
-local function createESP(player)
-    if not espBoxes[player] and player.Character then
-        local box = Drawing.new("Square")
-        box.Thickness = 2
-        box.Color = Color3.fromRGB(255, 0, 0) -- Vermelho
-        box.Filled = false
-        box.Visible = false
-
-        local text = Drawing.new("Text")
-        text.Color = Color3.fromRGB(255, 255, 255)
-        text.Size = 16
-        text.Center = true
-        text.Outline = true
-        text.Visible = false
-        
-        espBoxes[player] = {box = box, text = text}
+-- Função para alternar abas
+local function switchTab(tab)
+    AimbotContent.Visible = false
+    VisualsContent.Visible = false
+    
+    -- Reset cores
+    AimbotTab.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+    VisualsTab.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+    
+    if tab == "aimbot" then
+        AimbotContent.Visible = true
+        AimbotTab.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+    elseif tab == "visuals" then
+        VisualsContent.Visible = true
+        VisualsTab.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
     end
 end
 
-local function getClosestToCrosshair()
-    local closestEnemy = nil
-    local shortestAngle = math.huge  
+-- Conectar botões das abas
+AimbotTab.MouseButton1Click:Connect(function()
+    switchTab("aimbot")
+end)
 
+VisualsTab.MouseButton1Click:Connect(function()
+    switchTab("visuals")
+end)
+
+-- Botão fechar
+CloseButton.MouseButton1Click:Connect(function()
+    ScreenGui:Destroy()
+end)
+
+-- Inicializar com aba aimbot
+switchTab("aimbot")
+
+-- FUNCIONALIDADES DO HACK
+
+-- Aimbot
+local function getClosestPlayer()
+    local closestPlayer = nil
+    local shortestDistance = math.huge
+    local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    
     for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and (not teamCheckEnabled or not isSameTeam(player)) then  -- Condição modificada para FFA
-            local head = player.Character:FindFirstChild("Head")
-                        or player.Character:FindFirstChild("UpperTorso")
-                        or player.Character:FindFirstChild("HumanoidRootPart")
-            if head then
-                local screenPosition, onScreen = Camera:WorldToViewportPoint(head.Position)
-                if onScreen then
-                    local mouseLocation = UserInputService:GetMouseLocation()
-                    local distanceFromCrosshair = (Vector2.new(screenPosition.X, screenPosition.Y) - mouseLocation).Magnitude
-                    if distanceFromCrosshair < shortestAngle then
-                        shortestAngle = distanceFromCrosshair
-                        closestEnemy = head
-                    end
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") then
+            local head = player.Character.Head
+            local screenPoint, onScreen = Camera:WorldToViewportPoint(head.Position)
+            
+            if onScreen then
+                local screenPos = Vector2.new(screenPoint.X, screenPoint.Y)
+                local distance = (screenCenter - screenPos).Magnitude
+                
+                if distance < shortestDistance then
+                    shortestDistance = distance
+                    closestPlayer = player
                 end
             end
         end
     end
-    return closestEnemy
+    
+    return closestPlayer
 end
 
-RunService.RenderStepped:Connect(function()
-    -- Remover jogadores "fantasmas" de espBoxes, caso o Character ou o Player não existam mais
-    for player, esp in pairs(espBoxes) do
-        if not player.Parent or not player.Character then
-            if esp.box then esp.box:Remove() end
-            if esp.text then esp.text:Remove() end
-            espBoxes[player] = nil
+local function aimLoop()
+    if not aimbotEnabled then return end
+    
+    local target = getClosestPlayer()
+    if target and target.Character and target.Character:FindFirstChild("Head") then
+        local targetPosition = target.Character.Head.Position
+        Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, targetPosition)
+    end
+end
+
+UserInputService.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton2 and aimbotEnabled then
+        isAiming = true
+        connection = RunService.Heartbeat:Connect(aimLoop)
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then
+        isAiming = false
+        if connection then
+            connection:Disconnect()
+            connection = nil
         end
     end
+end)
 
+-- ESP Functions
+function clearESP()
+    for _, espObject in pairs(espObjects) do
+        if espObject then
+            espObject:Destroy()
+        end
+    end
+    espObjects = {}
+end
+
+function createBox(player)
+    local box = Drawing.new("Quad")
+    box.Visible = false
+    box.PointA = Vector2.new(0, 0)
+    box.PointB = Vector2.new(0, 0)
+    box.PointC = Vector2.new(0, 0)
+    box.PointD = Vector2.new(0, 0)
+    box.Color = Color3.fromRGB(255, 0, 0)
+    box.Filled = false
+    box.Thickness = 2
+    box.Transparency = 1
+    
+    espObjects[player.Name .. "_box"] = box
+    return box
+end
+
+function createSkeleton(player)
+    local skeleton = {}
+    local connections = {
+        {"Head", "UpperTorso"},
+        {"UpperTorso", "LowerTorso"},
+        {"UpperTorso", "LeftUpperArm"},
+        {"LeftUpperArm", "LeftLowerArm"},
+        {"UpperTorso", "RightUpperArm"},
+        {"RightUpperArm", "RightLowerArm"},
+        {"LowerTorso", "LeftUpperLeg"},
+        {"LeftUpperLeg", "LeftLowerLeg"},
+        {"LowerTorso", "RightUpperLeg"},
+        {"RightUpperLeg", "RightLowerLeg"}
+    }
+    
+    for i, connection in pairs(connections) do
+        local line = Drawing.new("Line")
+        line.Visible = false
+        line.From = Vector2.new(0, 0)
+        line.To = Vector2.new(0, 0)
+        line.Color = Color3.fromRGB(255, 255, 255)
+        line.Thickness = 2
+        line.Transparency = 1
+        
+        skeleton[i] = {line = line, from = connection[1], to = connection[2]}
+        espObjects[player.Name .. "_skeleton_" .. i] = line
+    end
+    
+    return skeleton
+end
+
+function updateESP()
+    if not (boxEnabled or skeletonEnabled) then return end
+    
     for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and espEnabled and (not teamCheckEnabled or not isSameTeam(player)) then  -- Condição modificada para FFA
-            createESP(player)
-            local head = player.Character:FindFirstChild("Head")
-                        or player.Character:FindFirstChild("UpperTorso")
-                        or player.Character:FindFirstChild("HumanoidRootPart")
-            if head then
-                local screenPosition, onScreen = Camera:WorldToViewportPoint(head.Position)
-                if onScreen then
-                    local esp = espBoxes[player]
-                    if esp then
-                        esp.box.Visible = true
-                        esp.box.Position = Vector2.new(screenPosition.X - 25, screenPosition.Y - 25)
-                        esp.box.Size = Vector2.new(50, 50)
+        if player ~= LocalPlayer and player.Character then
+            -- Box ESP
+            if boxEnabled then
+                local box = espObjects[player.Name .. "_box"]
+                if not box then
+                    box = createBox(player)
+                end
+                
+                local character = player.Character
+                local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+                
+                if humanoidRootPart then
+                    local vector, onScreen = Camera:WorldToViewportPoint(humanoidRootPart.Position)
+                    if onScreen then
+                        local head = character:FindFirstChild("Head")
+                        local leg = character:FindFirstChild("LeftLowerLeg") or character:FindFirstChild("Left Leg")
                         
-                        -- ADICIONANDO DISTÂNCIA E VIDA
-                        local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
-                        if humanoid then
-                            local distance = math.floor((LocalPlayer.Character.Head.Position - head.Position).Magnitude)
-                            local health = math.floor(humanoid.Health)
-                            esp.text.Visible = true
-                            esp.text.Position = Vector2.new(screenPosition.X, screenPosition.Y - 35)
-                            esp.text.Text = string.format("Dist: %d | Vida: %d", distance, health)
+                        if head and leg then
+                            local headPos = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
+                            local legPos = Camera:WorldToViewportPoint(leg.Position - Vector3.new(0, 3, 0))
+                            
+                            local height = math.abs(headPos.Y - legPos.Y)
+                            local width = height * 0.5
+                            
+                            box.PointA = Vector2.new(vector.X - width/2, headPos.Y)
+                            box.PointB = Vector2.new(vector.X + width/2, headPos.Y)
+                            box.PointC = Vector2.new(vector.X + width/2, legPos.Y)
+                            box.PointD = Vector2.new(vector.X - width/2, legPos.Y)
+                            box.Visible = true
+                        end
+                    else
+                        box.Visible = false
+                    end
+                end
+            end
+            
+            -- Skeleton ESP
+            if skeletonEnabled then
+                local skeletonKey = player.Name .. "_skeleton_1"
+                if not espObjects[skeletonKey] then
+                    createSkeleton(player)
+                end
+                
+                local character = player.Character
+                for i = 1, 10 do
+                    local line = espObjects[player.Name .. "_skeleton_" .. i]
+                    if line then
+                        local connections = {
+                            {"Head", "UpperTorso"},
+                            {"UpperTorso", "LowerTorso"},
+                            {"UpperTorso", "LeftUpperArm"},
+                            {"LeftUpperArm", "LeftLowerArm"},
+                            {"UpperTorso", "RightUpperArm"},
+                            {"RightUpperArm", "RightLowerArm"},
+                            {"LowerTorso", "LeftUpperLeg"},
+                            {"LeftUpperLeg", "LeftLowerLeg"},
+                            {"LowerTorso", "RightUpperLeg"},
+                            {"RightUpperLeg", "RightLowerLeg"}
+                        }
+                        
+                        local connection = connections[i]
+                        if connection then
+                            local part1 = character:FindFirstChild(connection[1])
+                            local part2 = character:FindFirstChild(connection[2])
+                            
+                            if part1 and part2 then
+                                local pos1, onScreen1 = Camera:WorldToViewportPoint(part1.Position)
+                                local pos2, onScreen2 = Camera:WorldToViewportPoint(part2.Position)
+                                
+                                if onScreen1 and onScreen2 then
+                                    line.From = Vector2.new(pos1.X, pos1.Y)
+                                    line.To = Vector2.new(pos2.X, pos2.Y)
+                                    line.Visible = true
+                                else
+                                    line.Visible = false
+                                end
+                            else
+                                line.Visible = false
+                            end
                         end
                     end
-                else
-                    if espBoxes[player] then
-                        espBoxes[player].box.Visible = false
-                        espBoxes[player].text.Visible = false
-                    end
                 end
             end
-        else
-            if espBoxes[player] then
-                espBoxes[player].box.Visible = false
-                espBoxes[player].text.Visible = false
-            end
-        end
-    end
-
-    if aimbotEnabled and aiming then
-        local target = getClosestToCrosshair()
-        if target then
-            Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position)
-        end
-    end
-end)
-
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if input.UserInputType == Enum.UserInputType.MouseButton2 then
-        aiming = true
-    end
-end)
-UserInputService.InputEnded:Connect(function(input, gameProcessed)
-    if input.UserInputType == Enum.UserInputType.MouseButton2 then
-        aiming = false
-    end
-end)
-
-EspButton.MouseButton1Click:Connect(function()
-    espEnabled = not espEnabled
-    EspButton.Text = espEnabled and "Desativar ESP" or "Ativar ESP"
-end)
-
-AimbotButton.MouseButton1Click:Connect(function()
-    aimbotEnabled = not aimbotEnabled
-    AimbotButton.Text = aimbotEnabled and "Desativar Aimbot" or "Ativar Aimbot"
-end)
-
--- Ativando/desativando o TeamCheck
-TeamCheckButton.MouseButton1Click:Connect(function()
-    teamCheckEnabled = not teamCheckEnabled
-    TeamCheckButton.Text = teamCheckEnabled and "Desativar TeamCheck" or "Ativar TeamCheck"
-end)
-
---------------------------------------------------
--- Atualização e exibição do TeleportFrame
---------------------------------------------------
-local function updateTeleportFrame()
-    -- Limpar as entradas antigas
-    for _, child in ipairs(TeleportFrame:GetChildren()) do
-        if child:IsA("TextButton") and child.Name == "TeleportEntry" then
-            child:Destroy()
-        end
-    end
-
-    local yPos = 0
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") and (not teamCheckEnabled or not isSameTeam(player)) then -- Condição modificada para FFA
-            local button = createButton(TeleportFrame, player.Name, UDim2.new(0, 10, 0, yPos))
-            button.Name = "TeleportEntry"
-            button.MouseButton1Click:Connect(function()
-                if player.Character and LocalPlayer.Character then
-                    LocalPlayer.Character:MoveTo(player.Character.Head.Position)
-                end
-                TeleportFrame.Visible = false
-            end)
-            yPos = yPos + 55
         end
     end
 end
 
-TeleportButton.MouseButton1Click:Connect(function()
-    updateTeleportFrame()
-    TeleportFrame.Visible = true
+-- ESP Loop
+RunService.Heartbeat:Connect(updateESP)
+
+-- Limpar ESP quando jogador sai
+Players.PlayerRemoving:Connect(function(player)
+    for key, espObject in pairs(espObjects) do
+        if string.find(key, player.Name) then
+            espObject:Destroy()
+            espObjects[key] = nil
+        end
+    end
 end)
 
-CloseTeleportButton.MouseButton1Click:Connect(function()
-    TeleportFrame.Visible = false
+print("Modern Hack carregado! Pressione INSERT para abrir/fechar")
+
+-- Toggle GUI com INSERT
+UserInputService.InputBegan:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.Insert then
+        MainFrame.Visible = not MainFrame.Visible
+    end
 end)
